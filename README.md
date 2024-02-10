@@ -2,6 +2,9 @@
 
 Top Schedule Fetcher is a Python program designed to retrieve schedules from the TOP Academy server. It offers functionalities to fetch daily or weekly schedules, display them neatly, and save them in JSON format.
 
+![Screenshot](https://github.com/Worton1720/Top-schedule-fetcher/assets/124402406/39330841-6252-4a77-a52a-243c38a3123e)
+
+
 ## Features
 - Fetch schedules for a specific day or the current week.
 - Display schedules with colorful formatting.
