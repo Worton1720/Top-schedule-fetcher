@@ -1,6 +1,6 @@
 from colorama import Fore
 from utils import validate_date
-from parsing.schedule_printer import SchedulePrinter
+from schedule_printer import SchedulePrinter
 
 
 class MenuController:
