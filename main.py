@@ -1,13 +1,18 @@
-import getpass
+"""
+Этот модуль представляет возможность скрытого ввода.
+"""
+from getpass import getpass
 import json
 from colorama import Fore
-from modules.utils import *
-from modules.Schedule import ScheduleFetcher
-from modules.Schedule import ScheduleManager
+from modules.schedule import ScheduleFetcher
+from modules.schedule import ScheduleManager
 from modules.menu_controller import MenuController
+from modules.utils import get_args, load_data, check_token_validity, get_refresh_token, save_data
+
+DB_FILE = "schedule.db"
 
 
-def main():
+def main() -> None:
     args = get_args()
     headers = json.loads(args.headers)
 
@@ -15,16 +20,15 @@ def main():
         f"{Fore.MAGENTA}Добро пожаловать в программу получения расписания с сайта TOP!{Fore.RESET}"
     )
 
-    refresh_token, username, password = load_data()
+    refresh_token = load_data(DB_FILE)
 
     if not (refresh_token and check_token_validity(args.url, headers)):
-        if not (username and password):
-            username = input("Введите ваш логин: ").strip()
-            password = getpass.getpass("Введите ваш пароль: ").strip()
+        username = input("Введите ваш логин: ").strip()
+        password = getpass("Введите ваш пароль(пороль скрыт при записи): ").strip()
 
         refresh_token = get_refresh_token(username, password)
         if refresh_token:
-            save_data(refresh_token)
+            save_data(refresh_token, DB_FILE)
         else:
             print("Не удалось получить refresh token. Пожалуйста, повторите попытку.")
             return

@@ -1,10 +1,13 @@
-import datetime
 import json
+import os
+import sqlite3
 import requests
+import datetime
 from colorama import Fore
+from tabulate import tabulate
 from modules.utils import get_file_path
-from tabulate import tabulate as tbl
 
+DB_FILE = "schedule.db"
 
 
 class ScheduleFetcher:
@@ -62,43 +65,77 @@ class SchedulePrinter:
                 if entry["date"] != current_date:
                     if current_date:
                         table_data.append([""])
+                    date_obj = datetime.datetime.strptime(entry["date"], "%Y-%m-%d")
                     day_of_week = ScheduleManager.get_weekday_by_date(entry["date"])
 
                     print(
-                        f"{Fore.YELLOW}Дата: {entry['date']} ({day_of_week}){Fore.RESET}"
+                        f"{Fore.LIGHTCYAN_EX}Дата: {entry['date']} ({day_of_week}){Fore.RESET}"
                     )
                     current_date = entry["date"]
                 lesson_info = [
-                    f"{Fore.BLUE}Урок: {entry['lesson']}",
-                    f"Время начала: {entry['started_at']}",
-                    f"Время окончания: {entry['finished_at']}",
+                    f"Урок: {entry['lesson']}",
+                    f"Длительность пары: {entry['started_at']}|{entry['finished_at']}",
                     f"Преподаватель: {entry['teacher_name']}",
                     f"Предмет: {entry['subject_name']}",
-                    f"Аудитория: {entry['room_name']}{Fore.RESET}",
+                    f"Аудитория: {entry['room_name']}",
                 ]
                 table_data.append(lesson_info)
-            print(tbl(table_data, tablefmt="grid"))
+            print(tabulate(table_data, tablefmt="grid"))
         else:
             print(f"{Fore.YELLOW}Расписание на указанный день отсутствует.{Fore.RESET}")
 
     @staticmethod
-    def save_to_json(data, filename):
-        """Сохранение данных в JSON файл.
+    def save_to_json(schedule_data, filename):
+        if not os.path.exists(filename):
+            open(filename, 'w').close()
+
+        with open(filename, 'w', encoding='cp1251') as file:
+            json.dump(schedule_data, file, ensure_ascii=False)
+
+    @staticmethod
+    def save_to_database(schedule_data, db_file_name: str = DB_FILE):
+        """Сохранение данных в базу данных.
 
         Args:
-            data (dict): Данные для сохранения.
-            filename (str): Имя файла для сохранения.
+            schedule_data (dict): Данные расписания.
         """
-        try:
-            with open(get_file_path(filename), "w", encoding="utf-8") as file:
-                json.dump(data, file, ensure_ascii=False, indent=4)
-            print(
-                f'{Fore.GREEN}Данные успешно сохранены в файл: "{filename}"{Fore.RESET}'
+        db_file_name = get_file_path(db_file_name)
+        conn = sqlite3.connect(db_file_name)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedule (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT,
+                lesson TEXT,
+                started_at TEXT,
+                finished_at TEXT,
+                teacher_name TEXT,
+                subject_name TEXT,
+                room_name TEXT
             )
-        except Exception as e:
-            print(
-                f'{Fore.RED}Ошибка при сохранении данных в файл "{filename}": {e}{Fore.RESET}'
-            )
+        """
+        )
+        for date, entries in schedule_data.items():
+            for entry in entries:
+                cursor.execute(
+                    """
+                    INSERT INTO schedule (date, lesson, started_at, finished_at, teacher_name, subject_name, room_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        date,
+                        entry["lesson"],
+                        entry["started_at"],
+                        entry["finished_at"],
+                        entry["teacher_name"],
+                        entry["subject_name"],
+                        entry["room_name"],
+                    ),
+                )
+        conn.commit()
+        conn.close()
+        print(f"{Fore.GREEN}Данные успешно сохранены в базу данных.{Fore.RESET}")
 
 
 class ScheduleManager:
@@ -133,34 +170,6 @@ class ScheduleManager:
         }
         date_obj = datetime.datetime.strptime(date, r"%Y-%m-%d")
         return weekdays[date_obj.weekday()]
-
-    @staticmethod
-    def sort_schedule_by_day(schedule_data):
-        """Сортировка расписания по дням.
-
-        Args:
-            schedule_data (list): Данные расписания.
-
-        Returns:
-            dict: Отсортированные данные расписания по дням.
-        """
-        sorted_schedule = {}
-        for entry in schedule_data:
-            date = entry["date"]
-            if date not in sorted_schedule:
-                sorted_schedule[date] = []
-            sorted_schedule[date].append(entry)
-        return sorted_schedule
-
-    @staticmethod
-    def get_current_week_dates():
-        """Возвращает список дат текущей недели от понедельника до воскресенья."""
-        today = datetime.date.today()
-        start_of_week = today - datetime.timedelta(days=today.weekday())
-        return [
-            (start_of_week + datetime.timedelta(days=i)).strftime("%Y-%m-%d")
-            for i in range(7)
-        ]
 
     def get_schedule_by_date(self, date):
         """Получение расписания на указанный день.
@@ -197,3 +206,13 @@ class ScheduleManager:
             current_week_schedule[date] = schedule_data
 
         return current_week_schedule
+
+    @staticmethod
+    def get_current_week_dates():
+        """Возвращает список дат текущей недели от понедельника до воскресенья."""
+        today = datetime.date.today()
+        start_of_week = today - datetime.timedelta(days=today.weekday())
+        return [
+            (start_of_week + datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+            for i in range(7)
+        ]

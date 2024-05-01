@@ -1,6 +1,6 @@
 import argparse
-import json
-import os
+import sqlite3
+
 from colorama import Fore
 import requests
 from pathlib import Path
@@ -62,20 +62,61 @@ def get_refresh_token(username: str, password: str) -> str | None:
         return None
 
 
-def save_data(refresh_token):
-    path = get_file_path("user_data.json")
-    data = {"refresh_token": refresh_token, "username": "", "password": ""}
-    with open(path, "w") as file:
-        json.dump(data, file)
+def save_data(refresh_token, DB_FILE_name: str):
+    """Сохранение данных в файл.
+
+    Args:
+        refresh_token (str): refresh token.
+        DB_FILE_name (str): Имя файла для сохранения.
+    """
+    DB_FILE_name = get_file_path(DB_FILE_name)
+    conn = sqlite3.connect(DB_FILE_name)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_data (
+            id INTEGER PRIMARY KEY,
+            refresh_token TEXT
+        )
+    """
+    )
+    cursor.execute(
+        """
+        INSERT INTO user_data (refresh_token) VALUES (?)
+    """,
+        (refresh_token,),
+    )
+    conn.commit()
+    conn.close()
 
 
-def load_data():
-    path = get_file_path("user_data.json")
-    if os.path.exists(path):
-        with open(path, "r") as file:
-            data = json.load(file)
-            return data.get("refresh_token"), data.get("username"), data.get("password")
-    return None, None, None
+def load_data(DB_FILE_name: str) -> str | None:
+    """Загрузка данных из файла.
+
+    Returns:
+        str: refresh token или None, если данные не найдены.
+    """
+    DB_FILE_name = get_file_path(DB_FILE_name)
+    conn = sqlite3.connect(DB_FILE_name)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_data (
+            id INTEGER PRIMARY KEY,
+            refresh_token TEXT
+        )
+    """
+    )
+    cursor.execute(
+        """
+        SELECT * FROM user_data
+    """
+    )
+    data = cursor.fetchone()
+    conn.close()
+    if data:
+        return data[1]
+    return None
 
 
 def check_token_validity(url, headers):
@@ -95,7 +136,8 @@ def get_file_path(file_name: str = None) -> str:
     """Return the path to a file in the directory of the current script."""
     try:
         dir_path = Path(__file__).resolve().parent
-        return str(dir_path if file_name is None else dir_path / file_name)
+        file_path = str(dir_path if file_name is None else dir_path / file_name).replace("modules\\", "")
+        return file_path
     except Exception as e:
         print(f"Ошибка: {e}")
         return "900"

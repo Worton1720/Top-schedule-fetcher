@@ -1,5 +1,7 @@
+import re
+
 from colorama import Fore
-from modules.Schedule import SchedulePrinter, ScheduleManager
+from modules.schedule import SchedulePrinter, ScheduleManager
 import pyfiglet
 
 
@@ -16,7 +18,7 @@ class MenuController:
 
     def run_menu(self):
         """Запуск основного меню программы."""
-        self.print_welcome_message()
+        # self.print_welcome_message()
 
         while True:
             self.print_menu_options()
